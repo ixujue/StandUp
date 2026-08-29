@@ -14,10 +14,11 @@ $:
       env:
         DEBIAN_FRONTEND: noninteractive
       volumes:
-        # 节点级缓存:加速后续构建
+        # 节点级缓存:加速后续构建(target 为 Cargo workspace 根的产物目录)
         - /root/.cargo:copy-on-write
         - /root/.rustup:copy-on-write
         - node_modules:copy-on-write
+        - target:copy-on-write
       stages:
         - name: 安装系统依赖
           script: |
@@ -58,8 +59,9 @@ $:
           script: |
             set -e
             mkdir -p dist
-            cp -v src-tauri/target/release/bundle/deb/*.deb dist/
-            cp -v src-tauri/target/release/bundle/appimage/*.AppImage dist/ 2>/dev/null || echo "无 AppImage 产物"
+            # Cargo workspace:产物在仓库根 target/,而非 src-tauri/target/
+            cp -v target/release/bundle/deb/*.deb dist/
+            cp -v target/release/bundle/appimage/*.AppImage dist/ 2>/dev/null || echo "无 AppImage 产物"
             ls -lh dist
         - name: 发布 Release
           type: git:release
