@@ -6,7 +6,7 @@ use tauri::{AppHandle, LogicalPosition, Manager, WebviewUrl, WebviewWindowBuilde
 /// 启动时创建隐藏的 card / break 窗口(main 由 tauri.conf.json 声明)。
 pub fn init(app: &AppHandle) -> tauri::Result<()> {
     if app.get_webview_window("card").is_none() {
-        WebviewWindowBuilder::new(app, "card", WebviewUrl::App("card.html".into()))
+        let builder = WebviewWindowBuilder::new(app, "card", WebviewUrl::App("card.html".into()))
             .title("StandUp")
             .inner_size(360.0, 132.0)
             .decorations(false)
@@ -14,9 +14,11 @@ pub fn init(app: &AppHandle) -> tauri::Result<()> {
             .skip_taskbar(true)
             .focused(false)
             .resizable(false)
-            .transparent(true)
-            .visible(false)
-            .build()?;
+            .visible(false);
+        // 透明窗口在 macOS 需要 macos-private-api(未启用),卡片退化为不透明矩形
+        #[cfg(not(target_os = "macos"))]
+        let builder = builder.transparent(true);
+        builder.build()?;
     }
     if app.get_webview_window("break").is_none() {
         WebviewWindowBuilder::new(app, "break", WebviewUrl::App("break.html".into()))
