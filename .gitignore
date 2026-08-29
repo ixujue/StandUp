@@ -8,6 +8,9 @@ ui/dist/
 # Tauri 生成物
 src-tauri/gen/
 
+# 签名密钥(绝不入库)
+keystore/
+
 # 系统
 *.log
 Thumbs.db

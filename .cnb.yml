@@ -1,0 +1,42 @@
+# StandUp 云原生构建(CNB)
+# 打 tag 时自动构建 Linux 包(AppImage / deb),作为 GitHub Release 的国内下载源。
+# Windows(NSIS)/ macOS(dmg)需要对应系统环境,由 GitHub Actions 承担。
+# Android 签名包待签名密钥接入 CNB 密钥仓库后加入。
+
+$:
+  tag_push:
+    - name: build-linux
+      runner:
+        cpus: 8
+      docker:
+        image: ubuntu:22.04
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      volumes:
+        # 节点级缓存:加速后续构建
+        - /root/.cargo:copy-on-write
+        - /root/.rustup:copy-on-write
+        - node_modules:copy-on-write
+      stages:
+        - name: 安装系统依赖
+          script: |
+            apt-get update
+            apt-get install -y --no-install-recommends curl ca-certificates build-essential file \
+              libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev \
+              patchelf libssl-dev libx11-dev libxss-dev libxcb1-dev
+        - name: 安装 Rust 与 Node
+          script: |
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile minimal
+            curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+            apt-get install -y nodejs
+        - name: 构建 Linux 包
+          script: |
+            source "$HOME/.cargo/env"
+            npm ci
+            npm run tauri build -- --bundles appimage,deb
+        - name: 收集产物
+          script: |
+            mkdir -p dist
+            cp -v src-tauri/target/release/bundle/appimage/*.AppImage dist/ || true
+            cp -v src-tauri/target/release/bundle/deb/*.deb dist/ || true
+            ls -lh dist
