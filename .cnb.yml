@@ -1,7 +1,8 @@
 # StandUp 云原生构建(CNB)
-# 打 tag 时自动构建 Linux 包(AppImage / deb),作为 GitHub Release 的国内下载源。
+# 打 tag 时自动构建 Linux 包(deb 必出 / AppImage 尽力),发布到 CNB Release 并挂附件,
+# 作为 GitHub Release 的国内下载源。
 # Windows(NSIS)/ macOS(dmg)需要对应系统环境,由 GitHub Actions 承担。
-# Android 签名包待签名密钥接入 CNB 密钥仓库后加入。
+# 注意:流水线默认 shell 是 sh(Ubuntu 为 dash),不用 source/bashism;多行脚本需显式 set -e。
 
 $:
   tag_push:
@@ -20,23 +21,60 @@ $:
       stages:
         - name: 安装系统依赖
           script: |
+            set -e
             apt-get update
-            apt-get install -y --no-install-recommends curl ca-certificates build-essential file \
+            apt-get install -y --no-install-recommends curl ca-certificates xz-utils build-essential file pkg-config \
               libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev \
               patchelf libssl-dev libx11-dev libxss-dev libxcb1-dev
-        - name: 安装 Rust 与 Node
+        - name: 安装 Rust 与 Node(国内源)
           script: |
+            set -e
+            # crates.io 国内镜像(写入 cargo 主目录,后续构建复用)
+            mkdir -p /root/.cargo
+            cat > /root/.cargo/config.toml <<'EOF'
+            [source.crates-io]
+            replace-with = 'rsproxy-sparse'
+            [source.rsproxy-sparse]
+            registry = "sparse+https://rsproxy.cn/index/"
+            [net]
+            git-fetch-with-cli = true
+            EOF
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile minimal
-            curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-            apt-get install -y nodejs
+            # Node 官方 tar 包(npmmirror 镜像),避开 nodesource 外部源
+            curl -fL https://npmmirror.com/mirrors/node/v22.14.0/node-v22.14.0-linux-x64.tar.xz -o /tmp/node.tar.xz
+            tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1
+            npm config set registry https://registry.npmmirror.com
+            node -v && npm -v
         - name: 构建 Linux 包
           script: |
-            source "$HOME/.cargo/env"
+            set -e
+            export PATH="$HOME/.cargo/bin:$PATH"
+            . "$HOME/.cargo/env"
             npm ci
-            npm run tauri build -- --bundles appimage,deb
+            npm run tauri build -- --bundles deb
+            # AppImage 需从 GitHub 下载 linuxdeploy 工具,构建机访问不稳定;失败不阻塞 deb 交付
+            npm run tauri build -- --bundles appimage || echo "WARN: AppImage 构建失败,本次仅交付 deb"
         - name: 收集产物
           script: |
+            set -e
             mkdir -p dist
-            cp -v src-tauri/target/release/bundle/appimage/*.AppImage dist/ || true
-            cp -v src-tauri/target/release/bundle/deb/*.deb dist/ || true
+            cp -v src-tauri/target/release/bundle/deb/*.deb dist/
+            cp -v src-tauri/target/release/bundle/appimage/*.AppImage dist/ 2>/dev/null || echo "无 AppImage 产物"
             ls -lh dist
+        - name: 发布 Release
+          type: git:release
+          options:
+            latest: true
+            description: |
+              StandUp Linux 安装包(国内下载源)。
+
+              - .deb:Debian/Ubuntu 及衍生发行版,`sudo apt install ./standup_*.deb`
+              - .AppImage:免安装,`chmod +x` 后直接运行
+
+              Windows(NSIS)/ macOS(dmg)/ Android(APK)请前往 GitHub Releases 下载:
+              https://github.com/ixujue/StandUp/releases
+        - name: 上传附件到 Release
+          image: cnbcool/attachments:latest
+          settings:
+            attachments:
+              - "./dist/*"
