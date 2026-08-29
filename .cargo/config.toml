@@ -1,0 +1,4 @@
+# Android 16KB 内存页对齐(Android 15+/16 设备必需,否则加载即崩溃)
+# NDK r26 默认仍按 4KB 对齐,需显式指定;链接器由用户级 ~/.cargo/config.toml 提供
+[target.aarch64-linux-android]
+rustflags = ["-C", "link-arg=-Wl,-z,max-page-size=16384"]
