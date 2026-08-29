@@ -32,6 +32,74 @@ jobs:
         with:
           tagName: standup-v__VERSION__
           releaseName: "StandUp v__VERSION__"
-          releaseBody: "Windows 安装包(NSIS)。未签名:SmartScreen 提示时选「更多信息 → 仍要运行」。"
+          releaseBody: "Windows 安装包(NSIS)。未签名:SmartScreen 提示时选「更多信息 → 仍要运行」。macOS / Linux 构建为 experimental(未经真机测试)。"
           releaseDraft: true
           prerelease: false
+          args: --bundles nsis
+
+  linux:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and attach AppImage / deb
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: standup-v__VERSION__
+          releaseName: "StandUp v__VERSION__"
+          releaseBody: "experimental(未经真机测试);Wayland 下暂无空闲检测,提醒照常但不自动暂停。"
+          releaseDraft: true
+          prerelease: false
+          args: --bundles appimage,deb
+
+  macos:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and attach dmg
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: standup-v__VERSION__
+          releaseName: "StandUp v__VERSION__"
+          releaseBody: "experimental(未经真机测试、未签名/公证):首次打开需右键 → 打开以绕过 Gatekeeper;空闲检测需在系统设置授予输入监控类权限(如被要求)。"
+          releaseDraft: true
+          prerelease: false
+          args: --bundles dmg
