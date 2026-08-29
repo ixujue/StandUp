@@ -18,7 +18,6 @@ pub fn get_config(state: State<AppState>) -> Config {
 
 #[tauri::command]
 pub fn save_config(app: AppHandle, state: State<AppState>, config: Config) -> Result<(), String> {
-    let autostart = config.autostart;
     let break_theme = config.break_theme.clone();
     state
         .store
@@ -35,9 +34,18 @@ pub fn save_config(app: AppHandle, state: State<AppState>, config: Config) -> Re
     )
     .ok();
 
-    use tauri_plugin_autostart::ManagerExt as _;
-    let autolaunch = app.autolaunch();
-    let _ = if autostart { autolaunch.enable() } else { autolaunch.disable() };
+    // 开机自启仅桌面端有概念(D10;移动端由系统后台策略决定)
+    #[cfg(desktop)]
+    {
+        let autostart = {
+            let st = state.store.lock().unwrap();
+            st.config.autostart
+        };
+        use tauri_plugin_autostart::ManagerExt as _;
+        let autolaunch = app.autolaunch();
+        let _ = if autostart { autolaunch.enable() } else { autolaunch.disable() };
+    }
+    let _ = app; // 移动端无自启操作
     Ok(())
 }
 

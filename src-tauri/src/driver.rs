@@ -5,7 +5,11 @@ use std::sync::mpsc;
 use standup_core::Output;
 use tauri::{AppHandle, Emitter, Manager};
 
-use crate::{tray, windows, AppState};
+#[cfg(desktop)]
+use crate::{tray, windows};
+#[cfg(mobile)]
+use crate::windows;
+use crate::AppState;
 
 pub fn spawn(app: AppHandle, rx: mpsc::Receiver<standup_core::Input>) {
     std::thread::spawn(move || {
@@ -44,6 +48,7 @@ fn apply(app: &AppHandle, out: Output) {
         }
         Output::CloseBreak => windows::hide_break(app),
         Output::StateChanged => {
+            #[cfg(desktop)]
             tray::update(app);
             let snap = app.state::<AppState>().core.lock().unwrap().snapshot(now_ms());
             let _ = app.emit("state-changed", &snap);
