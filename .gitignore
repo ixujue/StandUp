@@ -1,0 +1,15 @@
+# Rust / Cargo
+/target/
+
+# Node
+node_modules/
+ui/dist/
+
+# Tauri 生成物
+src-tauri/gen/
+
+# 系统
+*.log
+Thumbs.db
+.DS_Store
+release-artifacts/

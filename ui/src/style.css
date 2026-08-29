@@ -1,0 +1,92 @@
+@import "tailwindcss";
+
+/*
+ * 全局主题(皮肤系统雏形):一套 design tokens,三窗口(设置/卡片/休息页)共用。
+ * 主题切换 = html[data-theme] 切换,组件只消费 CSS 变量,新增皮肤即新增一段变量。
+ */
+
+:root,
+[data-theme="aurora"] {
+  --bg: linear-gradient(160deg, #0b1026 0%, #141b3d 48%, #22306b 100%);
+  --card: rgba(255, 255, 255, 0.055);
+  --card-border: rgba(255, 255, 255, 0.09);
+  --text: #eef1ff;
+  --text-sub: rgba(238, 241, 255, 0.55);
+  --accent: #7aa5ff;
+  --accent-contrast: #ffffff;
+  --accent-grad: linear-gradient(90deg, #38bdf8, #6366f1);
+  --track: rgba(255, 255, 255, 0.16);
+  --glow: rgba(99, 132, 255, 0.3);
+  --ring: rgba(160, 180, 255, 0.9);
+}
+
+[data-theme="forest"] {
+  --bg: linear-gradient(160deg, #0a1b15 0%, #123328 50%, #1f5040 100%);
+  --card: rgba(255, 255, 255, 0.055);
+  --card-border: rgba(255, 255, 255, 0.1);
+  --text: #f0f7f2;
+  --text-sub: rgba(240, 247, 242, 0.55);
+  --accent: #6ee7b7;
+  --accent-contrast: #06281c;
+  --accent-grad: linear-gradient(90deg, #34d399, #0ea5e9);
+  --track: rgba(255, 255, 255, 0.16);
+  --glow: rgba(84, 220, 160, 0.26);
+  --ring: rgba(150, 235, 195, 0.9);
+}
+
+[data-theme="dawn"] {
+  --bg: linear-gradient(160deg, #f7f3ec 0%, #f2e9da 46%, #dfe9f2 100%);
+  --card: rgba(255, 255, 255, 0.65);
+  --card-border: rgba(58, 54, 48, 0.1);
+  --text: #3a3630;
+  --text-sub: rgba(58, 54, 48, 0.55);
+  --accent: #e5920f;
+  --accent-contrast: #ffffff;
+  --accent-grad: linear-gradient(90deg, #f59e0b, #f97316);
+  --track: rgba(58, 54, 48, 0.16);
+  --glow: rgba(255, 190, 110, 0.4);
+  --ring: rgba(120, 100, 70, 0.65);
+}
+
+html {
+  background: var(--bg);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* 分组卡片 */
+.skin-card {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 1rem;
+}
+
+.sub {
+  color: var(--text-sub);
+}
+
+/* 控件配色跟随主题 */
+input[type="range"],
+input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+
+input[type="range"] {
+  height: 1.25rem;
+}
+
+/* 细滚动条,融入背景 */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--track);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}

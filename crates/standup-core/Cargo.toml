@@ -1,0 +1,12 @@
+[package]
+name = "standup-core"
+description = "StandUp 久坐提醒核心:平台无关的计时状态机与事件模型"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1"

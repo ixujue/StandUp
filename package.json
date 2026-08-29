@@ -1,0 +1,13 @@
+{
+  "name": "standup",
+  "private": true,
+  "workspaces": ["ui"],
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "npm run dev -w ui",
+    "build": "npm run build -w ui"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}
