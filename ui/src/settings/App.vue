@@ -354,11 +354,12 @@ async function refresh() {
             />
           </div>
           <div class="mt-2">
-            <label class="text-xs sub">账号</label>
+            <label class="text-xs sub">账号(坚果云填登录邮箱,不是应用名称)</label>
             <input
               v-model="syncForm.username"
               type="text"
               autocomplete="off"
+              placeholder="例如 light@163.com"
               class="mt-1 w-full rounded-lg px-2.5 py-1.5 text-sm outline-none"
               :style="{ background: 'var(--track)', border: '1px solid var(--card-border)' }"
               @change="saveSync(false)"

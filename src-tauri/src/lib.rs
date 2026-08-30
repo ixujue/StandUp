@@ -5,6 +5,7 @@
 mod commands;
 mod driver;
 mod platform;
+mod secret;
 mod store;
 mod sync;
 

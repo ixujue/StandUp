@@ -1,6 +1,6 @@
 //! WebDAV 同步(D13):配置按"新时间戳赢"(LWW),事件流水按并集追加合并。
 //! 远端布局:`<url>/standup/config.json`、`<url>/standup/events.jsonl`;
-//! 凭据存系统凭证管理器(keyring),同步设置本体不参与同步。
+//! 密码存取见 secret.rs(Windows DPAPI / 其他平台 keyring),同步设置本体不参与同步。
 
 use std::fs;
 use std::path::PathBuf;
@@ -9,13 +9,12 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
 
-use crate::{driver, AppState};
+use crate::{driver, secret, AppState};
 
 const META_FILE: &str = "sync.json";
-const KEYRING_SERVICE: &str = "standup-webdav";
 const HTTP_TIMEOUT: Duration = Duration::from_secs(20);
 
-/// 同步设置与状态(本地 `sync.json`,不参与同步;密码只在 keyring)。
+/// 同步设置与状态(本地 `sync.json`,不参与同步;密码只在 secret 层)。
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SyncSettings {
     pub enabled: bool,
@@ -51,31 +50,6 @@ impl SyncMeta {
 
     pub fn save(&self) -> std::io::Result<()> {
         fs::write(&self.path, serde_json::to_string_pretty(&self.settings)?)
-    }
-}
-
-fn keyring_entry(username: &str) -> Result<keyring::Entry, String> {
-    keyring::Entry::new(KEYRING_SERVICE, username).map_err(|e| e.to_string())
-}
-
-pub fn get_password(username: &str) -> Result<String, String> {
-    let entry = keyring_entry(username)?;
-    // 凭据不存在时返回空串而非报错(首次配置)
-    entry.get_password().or_else(|e| match e {
-        keyring::Error::NoEntry => Ok(String::new()),
-        other => Err(other.to_string()),
-    })
-}
-
-pub fn set_password(username: &str, password: &str) -> Result<(), String> {
-    let entry = keyring_entry(username)?;
-    if password.is_empty() {
-        match entry.delete_credential() {
-            Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-            Err(e) => Err(e.to_string()),
-        }
-    } else {
-        entry.set_password(password).map_err(|e| e.to_string())
     }
 }
 
@@ -124,20 +98,19 @@ fn dav_url(base: &str, file: &str) -> String {
 
 /// 一次性同步。任何一步失败即整体失败,错误写回 meta 供 UI 展示。
 pub fn sync_once(app: &tauri::AppHandle) -> Result<String, String> {
-    let started = std::time::Instant::now();
     let state = app.state::<AppState>();
-    let (settings, events_path) = {
+    let (settings, app_dir) = {
         let st = state.store.lock().unwrap();
-        let meta_dir = st.dir.clone();
-        (st.sync_meta.settings.clone(), meta_dir.join("events.jsonl"))
+        (st.sync_meta.settings.clone(), st.dir.clone())
     };
+    let events_path = app_dir.join("events.jsonl");
     if !settings.enabled {
         return Err("同步未启用".into());
     }
     if settings.url.is_empty() || settings.username.is_empty() {
         return Err("请先填写服务器地址与账号".into());
     }
-    let password = get_password(&settings.username)?;
+    let password = secret::read_password(&app_dir, &settings.username)?;
     if password.is_empty() {
         return Err("请先填写应用密码".into());
     }
@@ -254,7 +227,6 @@ pub fn sync_once(app: &tauri::AppHandle) -> Result<String, String> {
         st.sync_meta.settings.last_error.clear();
         let _ = st.sync_meta.save();
     }
-    let _ = started;
     Ok("同步完成".into())
 }
 
@@ -327,3 +299,6 @@ mod tests {
         assert_eq!(merge_event_lines(a, b), vec!["{\"t\":\"reminder\",\"at_ms\":1}"]);
     }
 }
+
+
+

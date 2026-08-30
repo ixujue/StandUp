@@ -144,7 +144,7 @@ pub fn get_sync_info(state: State<AppState>) -> SyncInfo {
         enabled: s.enabled,
         url: s.url.clone(),
         username: s.username.clone(),
-        has_password: crate::sync::get_password(&s.username)
+        has_password: crate::secret::read_password(&st.dir, &s.username)
             .map(|p| !p.is_empty())
             .unwrap_or(false),
         last_sync_at: s.last_sync_at,
@@ -155,33 +155,31 @@ pub fn get_sync_info(state: State<AppState>) -> SyncInfo {
 
 #[tauri::command]
 pub fn save_sync_settings(
-    app: AppHandle,
     state: State<AppState>,
     enabled: bool,
     url: String,
     username: String,
     password: Option<String>,
 ) -> Result<(), String> {
+    let mut st = state.store.lock().unwrap();
+    let dir = st.dir.clone();
     {
-        let mut st = state.store.lock().unwrap();
         let s = &mut st.sync_meta.settings;
         s.enabled = enabled;
         s.url = url.trim().trim_end_matches('/').to_string();
         // 账号变更时旧凭据不再适用,清掉
         if s.username != username {
             if !s.username.is_empty() {
-                let _ = crate::sync::set_password(&s.username, "");
+                let _ = crate::secret::store_password(&dir, &s.username, "");
             }
             s.config_updated_at = driver::now_ms(); // 新端点无历史,以本机为准
         }
         s.username = username;
-        st.sync_meta.save().map_err(|e| e.to_string())?;
     }
+    st.sync_meta.save().map_err(|e| e.to_string())?;
     if let Some(p) = password {
-        let name = state.store.lock().unwrap().sync_meta.settings.username.clone();
-        crate::sync::set_password(&name, &p)?;
+        crate::secret::store_password(&dir, &st.sync_meta.settings.username, &p)?;
     }
-    let _ = app;
     Ok(())
 }
 
