@@ -151,14 +151,11 @@ async function refresh() {
 
 <template>
   <div class="flex h-screen flex-col">
-    <!-- 自绘标题栏(D9) -->
+    <!-- 自绘标题栏(D9):整条头部可拖动(✕ 按钮除外),双击最大化/还原 -->
     <header data-tauri-drag-region class="flex items-center justify-between px-4 py-2.5">
       <div class="flex items-center gap-2" data-tauri-drag-region>
-        <span
-          class="grid h-6 w-6 place-items-center rounded-lg text-xs"
-          :style="{ background: 'var(--accent-grad)' }"
-        >🧍</span>
-        <h1 class="text-sm font-semibold">StandUp</h1>
+        <span data-tauri-drag-region class="grid h-6 w-6 place-items-center rounded-lg text-xs" :style="{ background: 'var(--accent-grad)' }">🧍</span>
+        <h1 data-tauri-drag-region class="text-sm font-semibold">StandUp</h1>
       </div>
       <button
         class="rounded-lg px-2 py-0.5 text-zinc-400 transition hover:bg-white/10 hover:text-zinc-200"
@@ -394,7 +391,7 @@ async function refresh() {
         </section>
       </template>
 
-      <div class="mt-auto flex items-center justify-between pt-1">
+      <div data-tauri-drag-region class="mt-auto flex items-center justify-between pt-1">
         <button
           v-if="dev"
           class="rounded-lg border border-dashed px-2 py-1 text-xs sub transition hover:opacity-80"
