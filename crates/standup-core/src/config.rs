@@ -18,6 +18,8 @@ pub struct Config {
     pub break_theme: String,
     /// 开机自启(D10 默认开)。
     pub autostart: bool,
+    /// 常驻模式(D12):忽略键鼠空闲、始终计时;锁屏/睡眠仍判离开。
+    pub resident_mode: bool,
 }
 
 impl Default for Config {
@@ -29,6 +31,7 @@ impl Default for Config {
             fullscreen_break: false,
             break_theme: "aurora".to_string(),
             autostart: true,
+            resident_mode: false,
         }
     }
 }
@@ -46,5 +49,6 @@ mod tests {
         assert!(!cfg.fullscreen_break);
         assert_eq!(cfg.break_theme, "aurora");
         assert!(cfg.autostart);
+        assert!(!cfg.resident_mode);
     }
 }

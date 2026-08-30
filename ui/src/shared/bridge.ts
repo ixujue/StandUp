@@ -8,6 +8,8 @@ export interface Config {
   /** 全局主题(皮肤):aurora 夜航 / forest 森野 / dawn 晨雾,统管本体与休息页。 */
   break_theme: string;
   autostart: boolean;
+  /** 常驻模式(D12):忽略键鼠空闲、始终计时;锁屏/睡眠仍判离开。 */
+  resident_mode: boolean;
 }
 
 export interface DaySummary {

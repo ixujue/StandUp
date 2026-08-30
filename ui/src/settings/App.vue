@@ -167,6 +167,15 @@ async function refresh() {
           <span>开机自启</span>
           <input v-model="config.autostart" type="checkbox" class="h-4 w-4" @change="saveNow" />
         </div>
+        <div class="mt-2 flex items-center justify-between text-sm">
+          <span>常驻模式</span>
+          <input v-model="config.resident_mode" type="checkbox" class="h-4 w-4" @change="saveNow" />
+        </div>
+        <p class="mt-1 text-xs sub">
+          {{ config.resident_mode
+            ? "已开启:不看键鼠空闲、始终计时;锁屏或关机仍会判为离开。"
+            : "开启后不看键鼠空闲、始终计时,适合长时间阅读/看视频;锁屏仍判离开。" }}
+        </p>
       </section>
 
       <div class="mt-auto flex items-center justify-between pt-1">
