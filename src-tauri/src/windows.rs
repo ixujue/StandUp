@@ -62,9 +62,13 @@ pub fn hide_card(app: &AppHandle) {
     }
 }
 
+/// 休息页是否应处于可见状态:macOS 延迟隐藏的守护标志。
+static BREAK_VISIBLE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 /// 休息页:默认右下角小窗;全屏开关打开后覆盖主显示器(D7)。
 pub fn show_break(app: &AppHandle, fullscreen: bool) {
     if let Some(w) = app.get_webview_window("break") {
+        BREAK_VISIBLE.store(true, std::sync::atomic::Ordering::Release);
         if fullscreen {
             let _ = w.set_fullscreen(true);
         } else {
@@ -77,8 +81,27 @@ pub fn show_break(app: &AppHandle, fullscreen: bool) {
 
 pub fn hide_break(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("break") {
-        let _ = w.set_fullscreen(false);
-        let _ = w.hide();
+        #[cfg(target_os = "macos")]
+        {
+            // macOS 退全屏带动画,立即 hide 会被动画完成态覆盖(遮罩残留无法关闭)。
+            // 先退全屏,动画结束后再隐藏;期间若又开了新休息则跳过。
+            use std::sync::atomic::Ordering;
+            BREAK_VISIBLE.store(false, Ordering::Release);
+            let _ = w.set_fullscreen(false);
+            let w2 = w.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_millis(450));
+                if !BREAK_VISIBLE.load(Ordering::Acquire) {
+                    let _ = w2.hide();
+                }
+            });
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            BREAK_VISIBLE.store(false, std::sync::atomic::Ordering::Release);
+            let _ = w.set_fullscreen(false);
+            let _ = w.hide();
+        }
     }
 }
 
