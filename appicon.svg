@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1a2554"/>
+      <stop offset="1" stop-color="#34477f"/>
+    </linearGradient>
+    <linearGradient id="arc" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6f9bff"/>
+      <stop offset="1" stop-color="#a7c1ff"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 圆角方底板 -->
+  <rect width="1024" height="1024" rx="224" fill="url(#bg)"/>
+
+  <!-- 提醒进度环:轨道 + 走过 3/4 的高亮弧 -->
+  <circle cx="512" cy="512" r="310" fill="none" stroke="#2c3a6f" stroke-width="64"/>
+  <path d="M 512 202 A 310 310 0 1 1 202 512"
+        fill="none" stroke="url(#arc)" stroke-width="64" stroke-linecap="round"/>
+
+  <!-- 站立人形:头 + 胶囊躯干 -->
+  <circle cx="512" cy="380" r="62" fill="#f2f6ff"/>
+  <rect x="454" y="470" width="116" height="202" rx="58" fill="#f2f6ff"/>
+</svg>
