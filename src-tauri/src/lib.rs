@@ -6,6 +6,7 @@ mod commands;
 mod driver;
 mod platform;
 mod store;
+mod sync;
 
 #[cfg(desktop)]
 mod tray;
@@ -71,6 +72,9 @@ pub fn run() {
             // 状态机驱动循环:唯一推进 core 的线程
             driver::spawn(handle.clone(), rx);
 
+            // WebDAV 同步定时器(D13):启动后首推,此后每 15 分钟
+            sync::spawn_timer(handle.clone());
+
             #[cfg(desktop)]
             {
                 tray::setup(&handle)?;
@@ -106,6 +110,9 @@ pub fn run() {
             commands::pause,
             commands::resume,
             commands::hide_main,
+            commands::get_sync_info,
+            commands::save_sync_settings,
+            commands::sync_now,
         ])
         .run(tauri::generate_context!())
         .expect("StandUp 运行失败");

@@ -35,6 +35,17 @@ export interface Dashboard {
   snapshot: Snapshot;
 }
 
+/** WebDAV 同步状态(D13;密码只在系统凭证管理器,永不回传前端) */
+export interface SyncInfo {
+  enabled: boolean;
+  url: string;
+  username: string;
+  has_password: boolean;
+  last_sync_at: number;
+  last_sync_ok: boolean;
+  last_error: string;
+}
+
 /** 主题预设(皮肤系统雏形):swatch 用于设置窗的色卡按钮。 */
 export const SKINS = [
   { value: "aurora", label: "夜航", swatch: "linear-gradient(135deg, #0b1026, #22306b)" },
@@ -52,4 +63,8 @@ export const api = {
   pause: (kind: "1h" | "today") => invoke<void>("pause", { kind }),
   resume: () => invoke<void>("resume"),
   hideMain: () => invoke<void>("hide_main"),
+  getSyncInfo: () => invoke<SyncInfo>("get_sync_info"),
+  saveSyncSettings: (s: { enabled: boolean; url: string; username: string; password?: string }) =>
+    invoke<void>("save_sync_settings", s),
+  syncNow: () => invoke<string>("sync_now"),
 };

@@ -11,6 +11,10 @@ pub struct Store {
     pub config: Config,
     config_path: PathBuf,
     events_path: PathBuf,
+    /// 应用数据目录(sync.json 所在;同步模块读写事件文件用)。
+    pub dir: PathBuf,
+    /// WebDAV 同步设置与状态(D13;密码不在此,只在系统凭证管理器)。
+    pub sync_meta: crate::sync::SyncMeta,
     /// 内存流水副本,供今日概览聚合;文件为准,启动时回读。
     events: Vec<FlowEvent>,
 }
@@ -19,25 +23,37 @@ impl Store {
     pub fn load(dir: PathBuf) -> std::io::Result<Self> {
         let config_path = dir.join("config.json");
         let events_path = dir.join("events.jsonl");
+        let sync_meta = crate::sync::SyncMeta::load(&dir);
 
         let config = fs::read_to_string(&config_path)
             .ok()
             .and_then(|s| serde_json::from_str(&s).ok())
             .unwrap_or_default();
-        let events = fs::read_to_string(&events_path)
-            .map(|s| {
-                s.lines()
-                    .filter_map(|line| serde_json::from_str(line).ok())
-                    .collect()
-            })
-            .unwrap_or_default();
+        let events = Self::read_events(&events_path);
 
         Ok(Self {
             config,
             config_path,
             events_path,
+            dir,
+            sync_meta,
             events,
         })
+    }
+
+    fn read_events(path: &PathBuf) -> Vec<FlowEvent> {
+        fs::read_to_string(path)
+            .map(|s| {
+                s.lines()
+                    .filter_map(|line| serde_json::from_str(line).ok())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// 同步合并后重读事件文件(内存副本与磁盘保持一致)。
+    pub fn reload_events(&mut self) {
+        self.events = Self::read_events(&self.events_path);
     }
 
     pub fn save_config(&mut self, config: &Config) -> std::io::Result<()> {

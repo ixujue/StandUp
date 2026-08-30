@@ -25,6 +25,9 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 log = "0.4"
 chrono = "0.4"
+# WebDAV 同步(D13):HTTP 走 rustls(免系统 OpenSSL);凭据进系统凭证管理器
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls", "json"] }
+keyring = { version = "3", features = ["sync-secret-service"] }
 
 [target."cfg(windows)".dependencies]
 windows = { version = "0.58", features = [
