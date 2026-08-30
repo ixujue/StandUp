@@ -29,7 +29,9 @@ chrono = "0.4"
 # 其他平台用 keyring(系统凭证管理器)
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls", "json"] }
 
-[target."cfg(not(windows))".dependencies]
+# keyring 仅限桌面 unix(系统凭证管理器);Android/iOS 无 Secret Service,
+# 密码走 secret.rs 的应用私有文件回退(Phase 2 再接平台安全存储)。
+[target.'cfg(all(unix, not(target_os = "android"), not(target_os = "ios")))'.dependencies]
 keyring = { version = "3", features = ["sync-secret-service"] }
 
 [target."cfg(windows)".dependencies]

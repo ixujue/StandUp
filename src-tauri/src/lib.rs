@@ -36,6 +36,9 @@ pub struct AppState {
     pub tx: mpsc::Sender<Input>,
 }
 
+/// 移动端必须由 mobile_entry_point 生成 JNI 绑定(Kotlin 侧调用
+/// Rust.onCreate 等 native 方法);缺失则 System.loadLibrary 后启动即崩。
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let (tx, rx) = mpsc::channel::<Input>();
 

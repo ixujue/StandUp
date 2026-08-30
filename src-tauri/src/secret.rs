@@ -87,7 +87,29 @@ fn hex_decode(text: &str) -> Option<Vec<u8>> {
         .collect()
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "android")]
+pub fn store_password(dir: &Path, _username: &str, password: &str) -> Result<(), String> {
+    // Android 无系统级用户凭证服务:暂存应用私有目录(/data/data,仅本应用可读),
+    // Phase 2 接 Android Keystore 加密。
+    if password.is_empty() {
+        let _ = fs::remove_file(dir.join(CRED_FILE));
+        return Ok(());
+    }
+    fs::write(dir.join(CRED_FILE), hex_encode(password.as_bytes())).map_err(|e| e.to_string())
+}
+
+#[cfg(target_os = "android")]
+pub fn read_password(dir: &Path, _username: &str) -> Result<String, String> {
+    match fs::read_to_string(dir.join(CRED_FILE)) {
+        Ok(text) => {
+            let bytes = hex_decode(&text).ok_or("凭据文件损坏")?;
+            String::from_utf8(bytes).map_err(|e| e.to_string())
+        }
+        Err(_) => Ok(String::new()),
+    }
+}
+
+#[cfg(all(unix, not(target_os = "android"), not(target_os = "ios")))]
 pub fn store_password(_dir: &Path, username: &str, password: &str) -> Result<(), String> {
     let entry = keyring::Entry::new("standup-webdav", username).map_err(|e| e.to_string())?;
     if password.is_empty() {
@@ -100,7 +122,7 @@ pub fn store_password(_dir: &Path, username: &str, password: &str) -> Result<(),
     }
 }
 
-#[cfg(not(windows))]
+#[cfg(all(unix, not(target_os = "android"), not(target_os = "ios")))]
 pub fn read_password(_dir: &Path, username: &str) -> Result<String, String> {
     let entry = keyring::Entry::new("standup-webdav", username).map_err(|e| e.to_string())?;
     match entry.get_password() {

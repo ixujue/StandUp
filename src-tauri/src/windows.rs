@@ -62,20 +62,29 @@ pub fn hide_card(app: &AppHandle) {
     }
 }
 
-/// 休息页是否应处于可见状态:macOS 延迟隐藏的守护标志。
-static BREAK_VISIBLE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-
 /// 休息页:默认右下角小窗;全屏开关打开后覆盖主显示器(D7)。
+/// macOS 用 simple_fullscreen:不切 Space、无退全屏动画,原生全屏的
+/// 动画完成态会覆盖随后的 hide(遮罩残留 bug)。
 pub fn show_break(app: &AppHandle, fullscreen: bool) {
     if let Some(w) = app.get_webview_window("break") {
-        BREAK_VISIBLE.store(true, std::sync::atomic::Ordering::Release);
         if fullscreen {
-            let _ = w.set_fullscreen(true);
+            #[cfg(target_os = "macos")]
+            {
+                let _ = w.show();
+                if let Err(e) = w.set_simple_fullscreen(true) {
+                    log::warn!("break 进入 simple 全屏失败: {e}");
+                }
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                let _ = w.set_fullscreen(true);
+                let _ = w.show();
+            }
         } else {
             let _ = w.set_fullscreen(false);
             position_bottom_right(&w, 380.0, 460.0, 24.0);
+            let _ = w.show();
         }
-        let _ = w.show();
     }
 }
 
@@ -83,22 +92,15 @@ pub fn hide_break(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("break") {
         #[cfg(target_os = "macos")]
         {
-            // macOS 退全屏带动画,立即 hide 会被动画完成态覆盖(遮罩残留无法关闭)。
-            // 先退全屏,动画结束后再隐藏;期间若又开了新休息则跳过。
-            use std::sync::atomic::Ordering;
-            BREAK_VISIBLE.store(false, Ordering::Release);
-            let _ = w.set_fullscreen(false);
-            let w2 = w.clone();
-            std::thread::spawn(move || {
-                std::thread::sleep(std::time::Duration::from_millis(450));
-                if !BREAK_VISIBLE.load(Ordering::Acquire) {
-                    let _ = w2.hide();
-                }
-            });
+            if let Err(e) = w.set_simple_fullscreen(false) {
+                log::warn!("break 退出 simple 全屏失败: {e}");
+            }
+            if let Err(e) = w.hide() {
+                log::warn!("break 隐藏失败: {e}");
+            }
         }
         #[cfg(not(target_os = "macos"))]
         {
-            BREAK_VISIBLE.store(false, std::sync::atomic::Ordering::Release);
             let _ = w.set_fullscreen(false);
             let _ = w.hide();
         }
