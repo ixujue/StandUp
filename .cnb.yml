@@ -68,9 +68,9 @@ $:
           options:
             latest: true
             description: |
-              StandUp Linux 安装包(国内下载源)。
+              StandUp Linux 安装包(国内下载源;cnb 构建机为 Linux,仅产出 Linux 包)。
 
-              - .deb:Debian/Ubuntu 及衍生发行版,`sudo apt install ./standup_*.deb`
+              - .deb:Debian/Ubuntu 及衍生发行版,`sudo apt install ./StandUp_*.deb`
               - .AppImage:免安装,`chmod +x` 后直接运行
 
               Windows(NSIS)/ macOS(dmg)/ Android(APK)请前往 GitHub Releases 下载:
