@@ -2,11 +2,14 @@
 import { listen } from "@tauri-apps/api/event";
 import { computed, onMounted, ref, watch } from "vue";
 
-import { api, SKINS, type Config, type Dashboard, type Snapshot, type SyncInfo } from "../shared/bridge";
+import { api, SKINS, type Config, type DaySummary, type SyncInfo } from "../shared/bridge";
+import { mmss as mmssText, useSnapshot } from "../shared/snapshot";
 import { applyTheme } from "../shared/theme";
 
 const config = ref<Config | null>(null);
-const dashboard = ref<Dashboard | null>(null);
+// 概览(事件流水聚合)与快照(每秒心跳)分开更新:读秒不碰流水。
+const summary = ref<DaySummary | null>(null);
+const { view: snapshot } = useSnapshot();
 const saved = ref(false);
 const dev = import.meta.env.DEV;
 
@@ -115,19 +118,21 @@ const lastSyncText = computed(() => {
 });
 
 const stateText = computed(() => {
-  const s = dashboard.value?.snapshot;
+  const s = snapshot.value;
   if (!s) return "";
   switch (s.state) {
     case "Active":
       return s.next_reminder_in_ms != null
-        ? `计时中 · ${Math.max(1, Math.ceil(s.next_reminder_in_ms / 60000))} 分钟后提醒`
+        ? `计时中 · ${mmssText(s.next_reminder_in_ms)} 后提醒`
         : "计时中";
     case "OnBreak":
-      return `休息中 · 剩余 ${Math.ceil((s.break_remaining_ms ?? 0) / 1000)} 秒`;
+      return `休息中 · 剩余 ${mmssText(s.break_remaining_ms)}`;
     case "Away":
       return "已离开(键鼠空闲)";
     case "Paused":
-      return "已暂停";
+      return s.pause_until_ms != null
+        ? `已暂停 · 剩余 ${mmssText(s.pause_until_ms - Date.now())}`
+        : "已暂停";
   }
 });
 
@@ -137,10 +142,8 @@ onMounted(async () => {
   applyTheme(config.value.break_theme);
   await refresh();
   await refreshSync();
-  // 心跳每秒推快照:只更新 snapshot(读秒),summary 不动,避免每秒重算事件流水。
-  await listen<Snapshot>("state-changed", (e) => {
-    if (dashboard.value) dashboard.value.snapshot = e.payload;
-  });
+  // 状态变化时只刷概览(流水聚合),快照由 useSnapshot 订阅
+  await listen("state-changed", refresh);
   await listen("sync-changed", refreshSync);
   await listen<{ break_theme: string }>("config-changed", (e) => {
     applyTheme(e.payload.break_theme);
@@ -148,7 +151,7 @@ onMounted(async () => {
 });
 
 async function refresh() {
-  dashboard.value = await api.dashboard();
+  summary.value = await api.summary();
 }
 </script>
 
@@ -184,18 +187,18 @@ async function refresh() {
       </button>
     </nav>
 
-    <main v-if="config && dashboard" class="flex flex-1 flex-col gap-2.5 overflow-y-auto px-4 pb-3">
+    <main v-if="config && summary" class="flex flex-1 flex-col gap-2.5 overflow-y-auto px-4 pb-3">
       <!-- ============ 概览 ============ -->
       <template v-if="tab === 'overview'">
         <section class="skin-card relative overflow-hidden p-3.5">
           <div class="absolute inset-y-0 left-0 w-1" :style="{ background: 'var(--accent-grad)' }" />
           <h2 class="text-xs font-medium sub">今日久坐</h2>
           <p class="mt-0.5 text-3xl font-light tabular-nums">
-            {{ dashboard.summary.seated_min }}<span class="ml-1 text-xs font-normal sub">分钟</span>
+            {{ summary.seated_min }}<span class="ml-1 text-xs font-normal sub">分钟</span>
           </p>
           <p class="mt-0.5 text-xs sub">
-            提醒 {{ dashboard.summary.reminders }} 次 · 休息 {{ dashboard.summary.breaks }} 次(共
-            {{ dashboard.summary.break_min }} 分钟)
+            提醒 {{ summary.reminders }} 次 · 休息 {{ summary.breaks }} 次(共
+            {{ summary.break_min }} 分钟)
           </p>
         </section>
 
@@ -213,7 +216,7 @@ async function refresh() {
               立即休息
             </button>
             <button
-              v-if="dashboard.snapshot.state === 'Paused'"
+              v-if="snapshot?.state === 'Paused'"
               class="rounded-xl py-2 text-sm transition hover:opacity-90"
               :style="{ background: 'var(--track)' }"
               @click="api.resume(); refresh()"

@@ -1,6 +1,6 @@
 //! 前端 command 桥:只转发 Input / 读取快照,不直接改状态。
 
-use standup_core::{CardAction, Config, Input, Snapshot};
+use standup_core::{CardAction, Config, DaySummary, Input, Snapshot};
 use tauri::{AppHandle, Manager, State};
 
 use crate::{driver, windows, AppState};
@@ -56,6 +56,12 @@ pub fn get_dashboard(state: State<AppState>) -> Dashboard {
     let summary = state.store.lock().unwrap().today_summary();
     let snapshot = state.core.lock().unwrap().snapshot(driver::now_ms());
     Dashboard { summary, snapshot }
+}
+
+/// 只取今日概览(不读 core 快照):与每秒快照解耦,避免空转遍历事件流水。
+#[tauri::command]
+pub fn get_summary(state: State<AppState>) -> DaySummary {
+    state.store.lock().unwrap().today_summary()
 }
 
 #[tauri::command]

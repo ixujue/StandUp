@@ -69,15 +69,15 @@ pub fn run() {
 
             let handle = app.handle().clone();
 
-            // 平台输入源:1 秒空闲采样 + 锁屏/电源事件(D8;移动端暂为空实现)
+            // 平台输入源:1 秒空闲采样 + 锁屏/电源事件(D8;移动端暂无空闲 API,恒 idle=0)
             platform::spawn_tick_thread(tx.clone());
             platform::spawn_event_thread(tx.clone());
 
             // 状态机驱动循环:唯一推进 core 的线程
             driver::spawn(handle.clone(), rx);
 
-            // 1 秒心跳:广播快照给前端读秒(倒计时插值的数据源)
-            driver::spawn_snapshot_heartbeat(handle.clone());
+            // 1 秒心跳广播快照:前端据此读秒(本地插值,判定仍以 core 为准)
+            driver::spawn_heartbeat(handle.clone());
 
             // WebDAV 同步定时器(D13):启动后首推,此后每 15 分钟
             sync::spawn_timer(handle.clone());
@@ -111,6 +111,7 @@ pub fn run() {
             commands::get_config,
             commands::save_config,
             commands::get_dashboard,
+            commands::get_summary,
             commands::start_break,
             commands::dismiss_card,
             commands::end_break,

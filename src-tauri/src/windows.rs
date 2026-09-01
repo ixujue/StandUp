@@ -36,15 +36,23 @@ pub fn init(app: &AppHandle) -> tauri::Result<()> {
 
 pub fn show_main(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
-        let _ = w.show();
+        log::info!("window main: show");
+        if let Err(e) = w.show() {
+            log::warn!("window main show 失败: {e}");
+        }
         let _ = w.unminimize();
-        let _ = w.set_focus();
+        if let Err(e) = w.set_focus() {
+            log::warn!("window main set_focus 失败: {e}");
+        }
     }
 }
 
 pub fn hide_main(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
-        let _ = w.hide();
+        log::info!("window main: hide");
+        if let Err(e) = w.hide() {
+            log::warn!("window main hide 失败: {e}");
+        }
     }
 }
 
@@ -52,13 +60,19 @@ pub fn hide_main(app: &AppHandle) {
 pub fn show_card(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("card") {
         position_bottom_right(&w, 360.0, 132.0, 24.0);
-        let _ = w.show();
+        log::info!("window card: show");
+        if let Err(e) = w.show() {
+            log::warn!("window card show 失败: {e}");
+        }
     }
 }
 
 pub fn hide_card(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("card") {
-        let _ = w.hide();
+        log::info!("window card: hide");
+        if let Err(e) = w.hide() {
+            log::warn!("window card hide 失败: {e}");
+        }
     }
 }
 
@@ -67,6 +81,7 @@ pub fn hide_card(app: &AppHandle) {
 /// 动画完成态会覆盖随后的 hide(遮罩残留 bug)。
 pub fn show_break(app: &AppHandle, fullscreen: bool) {
     if let Some(w) = app.get_webview_window("break") {
+        log::info!("window break: show(fullscreen={fullscreen})");
         if fullscreen {
             #[cfg(target_os = "macos")]
             {
@@ -77,19 +92,28 @@ pub fn show_break(app: &AppHandle, fullscreen: bool) {
             }
             #[cfg(not(target_os = "macos"))]
             {
-                let _ = w.set_fullscreen(true);
-                let _ = w.show();
+                if let Err(e) = w.set_fullscreen(true) {
+                    log::warn!("break 进入全屏失败: {e}");
+                }
+                if let Err(e) = w.show() {
+                    log::warn!("break show 失败: {e}");
+                }
             }
         } else {
-            let _ = w.set_fullscreen(false);
+            if let Err(e) = w.set_fullscreen(false) {
+                log::warn!("break 退出全屏失败: {e}");
+            }
             position_bottom_right(&w, 380.0, 460.0, 24.0);
-            let _ = w.show();
+            if let Err(e) = w.show() {
+                log::warn!("break show 失败: {e}");
+            }
         }
     }
 }
 
 pub fn hide_break(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("break") {
+        log::info!("window break: hide(visible={:?})", w.is_visible());
         #[cfg(target_os = "macos")]
         {
             if let Err(e) = w.set_simple_fullscreen(false) {
@@ -101,8 +125,12 @@ pub fn hide_break(app: &AppHandle) {
         }
         #[cfg(not(target_os = "macos"))]
         {
-            let _ = w.set_fullscreen(false);
-            let _ = w.hide();
+            if let Err(e) = w.set_fullscreen(false) {
+                log::warn!("break 退出全屏失败: {e}");
+            }
+            if let Err(e) = w.hide() {
+                log::warn!("break 隐藏失败: {e}");
+            }
         }
     }
 }
