@@ -35,6 +35,12 @@ export interface Dashboard {
   snapshot: Snapshot;
 }
 
+/** 心跳/状态推送载荷:`ts_ms` 是后端取快照的时刻,前端据此本地插值(免每秒 IPC)。 */
+export interface SnapshotTick {
+  ts_ms: number;
+  snapshot: Snapshot;
+}
+
 /** WebDAV 同步状态(D13;密码只在系统凭证管理器,永不回传前端) */
 export interface SyncInfo {
   enabled: boolean;
@@ -57,6 +63,7 @@ export const api = {
   getConfig: () => invoke<Config>("get_config"),
   saveConfig: (config: Config) => invoke<void>("save_config", { config }),
   dashboard: () => invoke<Dashboard>("get_dashboard"),
+  summary: () => invoke<DaySummary>("get_summary"),
   startBreak: () => invoke<void>("start_break"),
   dismissCard: () => invoke<void>("dismiss_card"),
   endBreak: (completed: boolean) => invoke<void>("end_break", { completed }),

@@ -3,14 +3,17 @@ import { listen } from "@tauri-apps/api/event";
 import { computed, onBeforeUnmount, onMounted, ref, watchEffect } from "vue";
 
 import { api } from "../shared/bridge";
+import { mmss as mmssText, useSnapshot } from "../shared/snapshot";
 import { applyTheme } from "../shared/theme";
 
-const remaining = ref(0);
+// 剩余时长直接跟随后端每秒权威快照(本地插值平滑走字);
+// 判定仍以 core 的 BreakEnd / CloseBreak 为准(设计文档第四节)。
+const { view } = useSnapshot();
+// 首次心跳到达前先显示计划时长,避免出现 00:00 闪一下
+const remaining = computed(() => view.value?.break_remaining_ms ?? planned.value);
 const planned = ref(0);
 const adviceIndex = ref(0);
 
-// 倒计时由前端流畅渲染;判定以核心的 BreakEnd / CloseBreak 为准(设计文档第四节)。
-let ticker: ReturnType<typeof setInterval> | undefined;
 let adviceTimer: ReturnType<typeof setInterval> | undefined;
 
 const advices = [
@@ -30,10 +33,7 @@ const progress = computed(() =>
 );
 const dashOffset = computed(() => CIRCUMFERENCE * (1 - progress.value));
 
-const mmss = computed(() => {
-  const total = Math.max(0, Math.ceil(remaining.value / 1000));
-  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
-});
+const mmss = computed(() => mmssText(remaining.value));
 
 onMounted(async () => {
   // 支持浏览器直开预览:http://localhost:5173/break.html?theme=forest
@@ -46,12 +46,8 @@ onMounted(async () => {
 
     await listen<{ remaining_ms: number | null; theme?: string }>("break-started", (e) => {
       if (e.payload.theme) applyTheme(e.payload.theme);
-      remaining.value = e.payload.remaining_ms ?? 0;
-      planned.value = remaining.value;
-      clearInterval(ticker);
-      ticker = setInterval(() => {
-        if (remaining.value > 0) remaining.value -= 250;
-      }, 250);
+      // planned 只取一次起始值(画进度环用);走字全程由快照驱动
+      planned.value = e.payload.remaining_ms ?? 0;
     });
 
     // 设置窗切换主题时实时换肤
@@ -74,7 +70,6 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
-  clearInterval(ticker);
   clearInterval(adviceTimer);
 });
 </script>

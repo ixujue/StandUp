@@ -20,8 +20,26 @@ pub mod linux;
 #[cfg(target_os = "linux")]
 pub use linux::{spawn_event_thread, spawn_tick_thread};
 
+// Android / iOS:暂无系统级空闲 API,以 1 秒 Tick(idle=0)驱动状态机推进,
+// 否则 core 永远收不到 Tick,久坐不计时、提醒与休息倒计时都不会触发。
+// 事件源(锁屏/前后台)待 Phase 2 接入。
+
 #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
-pub fn spawn_tick_thread(_tx: std::sync::mpsc::Sender<standup_core::Input>) {}
+pub fn spawn_tick_thread(tx: std::sync::mpsc::Sender<standup_core::Input>) {
+    std::thread::spawn(move || loop {
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        if tx
+            .send(standup_core::Input::Tick {
+                now_ms: crate::driver::now_ms(),
+                idle_secs: 0,
+            })
+            .is_err()
+        {
+            log::info!("移动端采样线程退出:driver 通道已关闭");
+            break;
+        }
+    });
+}
 
 #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
 pub fn spawn_event_thread(_tx: std::sync::mpsc::Sender<standup_core::Input>) {}

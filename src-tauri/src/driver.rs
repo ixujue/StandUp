@@ -1,6 +1,7 @@
 //! 状态机驱动循环:唯一消费 Input、推进 Core、执行 Output 的线程。
 
 use std::sync::mpsc;
+use std::time::Duration;
 
 use standup_core::Output;
 use tauri::{AppHandle, Emitter, Manager};
@@ -24,6 +25,28 @@ pub fn spawn(app: AppHandle, rx: mpsc::Receiver<standup_core::Input>) {
             }
         }
     });
+}
+
+/// 1 秒心跳:广播权威快照,供前端读秒渲染。
+/// 前端以 `ts_ms` 为基准本地插值(250ms 刷新),两次心跳之间不再有 IPC;
+/// 所有窗口都隐藏时跳过 emit,省掉无谓的序列化与跨进程拷贝。
+pub fn spawn_heartbeat(app: AppHandle) {
+    std::thread::spawn(move || loop {
+        std::thread::sleep(Duration::from_secs(1));
+        if !any_window_visible(&app) {
+            continue;
+        }
+        let ts_ms = now_ms();
+        let snap = app.state::<AppState>().core.lock().unwrap().snapshot(ts_ms);
+        let _ = app.emit("snapshot", serde_json::json!({ "ts_ms": ts_ms, "snapshot": snap }));
+    });
+}
+
+/// 是否至少有一个窗口可见(不可见时前端无人看,不必推送)。
+fn any_window_visible(app: &AppHandle) -> bool {
+    app.webview_windows()
+        .values()
+        .any(|w| w.is_visible().unwrap_or(false))
 }
 
 fn apply(app: &AppHandle, out: Output) {
@@ -50,8 +73,9 @@ fn apply(app: &AppHandle, out: Output) {
         Output::StateChanged => {
             #[cfg(desktop)]
             tray::update(app);
-            let snap = app.state::<AppState>().core.lock().unwrap().snapshot(now_ms());
-            let _ = app.emit("state-changed", &snap);
+            let ts_ms = now_ms();
+            let snap = app.state::<AppState>().core.lock().unwrap().snapshot(ts_ms);
+            let _ = app.emit("state-changed", serde_json::json!({ "ts_ms": ts_ms, "snapshot": snap }));
         }
         Output::Flow(event) => {
             if let Err(err) = app.state::<AppState>().store.lock().unwrap().append(event) {
