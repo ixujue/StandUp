@@ -1,0 +1,20 @@
+# 页面自定义按钮:在「代码 → 分支」页(分支详情页)点「发版」即可一键构建发布。
+# 流水线逻辑见 .cnb.yml 的 $:web_trigger_release —— 这里只声明按钮,不写逻辑。
+#
+# 发版流程:点按钮 → 读 src-tauri/tauri.conf.json 的 version → 打 vX.Y.Z 标签并推送
+#          → tag_push 流水线自动接力(Linux 包 + GitHub 同步 + Release)
+#
+# 版本号约定:发版前请先改 src-tauri/tauri.conf.json 的 version 并合入 main,
+# 标签已存在时流水线会报错退出,不会重复构建。
+
+branch:
+  - reg: ^main$
+    buttons:
+      - name: 发版
+        description: 读取 tauri.conf.json 的 version,打 vX.Y.Z 标签并触发全平台构建
+        event: web_trigger_release
+        groupName: 发布
+        permissions:
+          roles:
+            - master
+            - developer

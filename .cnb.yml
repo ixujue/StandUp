@@ -3,22 +3,90 @@
 # 作为 GitHub Release 的国内下载源。
 # Windows(NSIS)/ macOS(dmg)需要对应系统环境,由 GitHub Actions 承担。
 # 注意:流水线默认 shell 是 sh(Ubuntu 为 dash),不用 source/bashism;多行脚本需显式 set -e。
+#
+# 前置配置(一次性):在 CNB 密钥仓库存放 GitHub 凭据,文件路径 .cnb/github.yml,内容形如:
+#   GITHUB_USER: ixujue
+#   GITHUB_TOKEN: ghp_xxx        # 需 repo 权限的 Personal Access Token
+#   allow_slugs: ["xujue.cn/StandUp"]
+#   allow_events: ["tag_push"]
+#   allow_images: ["tencentcom/git-sync"]
 
 $:
+
+  # 页面「发版」按钮(见 .cnb/web_trigger.yml):读取 tauri.conf.json 的 version,
+  # 打 vX.Y.Z 标签并推送,由下面的 tag_push 流水线接力完成 Linux 构建与 GitHub 同步。
+  # 这样构建/发布逻辑只有一份,不会两条链并发写同一个 Release。
+  web_trigger_release:
+    - name: 发版
+      env:
+        GIT_AUTHOR_NAME: StandUp Bot
+        GIT_AUTHOR_EMAIL: bot@standup.local
+      stages:
+        - name: 读取版本号
+          script: |
+            set -e
+            VER=$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' src-tauri/tauri.conf.json | head -1)
+            if [ -z "$VER" ]; then
+              echo "ERROR: 无法从 src-tauri/tauri.conf.json 读取 version"
+              exit 1
+            fi
+            echo "版本号: $VER"
+            echo "##[set-output TAG=v$VER]"
+            echo "##[set-output VERSION=$VER]"
+          exports:
+            TAG: RELEASE_TAG
+            VERSION: RELEASE_VERSION
+        - name: 检查标签是否已存在
+          script: |
+            set -e
+            REPO_PATH=$(echo "$CNB_REPO_URL_HTTPS" | sed 's#^https://##')
+            if git ls-remote --exit-code --tags "https://cnb:${CNB_TOKEN}@${REPO_PATH}" "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+              echo "ERROR: 标签 $RELEASE_TAG 已存在。请先提升 src-tauri/tauri.conf.json 的 version 再发版。"
+              exit 1
+            fi
+            echo "将创建标签 $RELEASE_TAG"
+        - name: 打标签并推送
+          script: |
+            set -e
+            git config user.name "StandUp Bot"
+            git config user.email "bot@standup.local"
+            git tag -a "$RELEASE_TAG" -m "StandUp $RELEASE_VERSION"
+            REPO_PATH=$(echo "$CNB_REPO_URL_HTTPS" | sed 's#^https://##')
+            git push "https://cnb:${CNB_TOKEN}@${REPO_PATH}" "$RELEASE_TAG"
+            echo "已推送 $RELEASE_TAG;后续构建请到「构建」页查看同名 tag_push 流水线。"
+
   tag_push:
+    # GitHub 凭据缺失(未配密钥仓库)时不阻塞 Linux 包交付,只打告警。
+    - name: sync-github
+      stages:
+        - name: 同步代码与 tag 到 GitHub
+          allowFailure: true
+          # Windows(NSIS)/ macOS(dmg)/ Android(APK)由 GitHub Actions 构建,
+          # 这里只负责把 main 与本次 tag 推过去触发它。
+          image: tencentcom/git-sync
+          settings:
+            target_url: https://github.com/ixujue/StandUp.git
+            auth_type: https
+            username: ${GITHUB_USER}
+            password: ${GITHUB_TOKEN}
+            branch: main
+            push_tags: true
+            git_user: StandUp Bot
+            git_email: bot@standup.local
+
     - name: build-linux
       runner:
         cpus: 8
       docker:
         image: ubuntu:22.04
+        volumes:
+          # 节点级缓存:加速后续构建(target 为 Cargo workspace 根的产物目录)
+          - /root/.cargo:copy-on-write
+          - /root/.rustup:copy-on-write
+          - node_modules:copy-on-write
+          - target:copy-on-write
       env:
         DEBIAN_FRONTEND: noninteractive
-      volumes:
-        # 节点级缓存:加速后续构建(target 为 Cargo workspace 根的产物目录)
-        - /root/.cargo:copy-on-write
-        - /root/.rustup:copy-on-write
-        - node_modules:copy-on-write
-        - target:copy-on-write
       stages:
         - name: 安装系统依赖
           script: |
