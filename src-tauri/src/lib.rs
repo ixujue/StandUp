@@ -76,6 +76,9 @@ pub fn run() {
             // 状态机驱动循环:唯一推进 core 的线程
             driver::spawn(handle.clone(), rx);
 
+            // 1 秒心跳:广播快照给前端读秒(倒计时插值的数据源)
+            driver::spawn_snapshot_heartbeat(handle.clone());
+
             // WebDAV 同步定时器(D13):启动后首推,此后每 15 分钟
             sync::spawn_timer(handle.clone());
 

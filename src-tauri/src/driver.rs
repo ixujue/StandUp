@@ -26,6 +26,20 @@ pub fn spawn(app: AppHandle, rx: mpsc::Receiver<standup_core::Input>) {
     });
 }
 
+/// 1 秒心跳:向所有窗口广播最新快照,前端据此做读秒与插值。
+/// 判定仍以 core 为准(Tick/BreakEnd);心跳只读不写,零额外依赖。
+pub fn spawn_snapshot_heartbeat(app: AppHandle) {
+    std::thread::spawn(move || loop {
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        let snap = {
+            let st = app.state::<AppState>();
+            let core = st.core.lock().unwrap();
+            core.snapshot(now_ms())
+        };
+        let _ = app.emit("state-changed", &snap);
+    });
+}
+
 fn apply(app: &AppHandle, out: Output) {
     match out {
         Output::ShowCard => {
