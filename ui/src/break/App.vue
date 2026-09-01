@@ -2,16 +2,30 @@
 import { listen } from "@tauri-apps/api/event";
 import { computed, onBeforeUnmount, onMounted, ref, watchEffect } from "vue";
 
-import { api } from "../shared/bridge";
+import { api, type Snapshot } from "../shared/bridge";
 import { applyTheme } from "../shared/theme";
 
 const remaining = ref(0);
 const planned = ref(0);
 const adviceIndex = ref(0);
 
-// 倒计时由前端流畅渲染;判定以核心的 BreakEnd / CloseBreak 为准(设计文档第四节)。
+// 倒计时由前端流畅渲染(250ms 插值);判定以核心的 BreakEnd / CloseBreak 为准,
+// 每秒心跳 state-changed 携带权威剩余时长用于对时(设计文档第四节)。
 let ticker: ReturnType<typeof setInterval> | undefined;
 let adviceTimer: ReturnType<typeof setInterval> | undefined;
+
+function startTicker() {
+  if (ticker) return;
+  ticker = setInterval(() => {
+    if (remaining.value > 0) remaining.value -= 250;
+    else stopTicker();
+  }, 250);
+}
+
+function stopTicker() {
+  clearInterval(ticker);
+  ticker = undefined;
+}
 
 const advices = [
   "看看 6 米外的地方",
@@ -48,10 +62,17 @@ onMounted(async () => {
       if (e.payload.theme) applyTheme(e.payload.theme);
       remaining.value = e.payload.remaining_ms ?? 0;
       planned.value = remaining.value;
-      clearInterval(ticker);
-      ticker = setInterval(() => {
-        if (remaining.value > 0) remaining.value -= 250;
-      }, 250);
+      startTicker();
+    });
+
+    // 心跳对时:核心每秒广播快照,以权威剩余时长校正本地插值的漂移。
+    await listen<Snapshot>("state-changed", (e) => {
+      const r = e.payload.break_remaining_ms;
+      if (r != null) {
+        remaining.value = r;
+        if (r > planned.value) planned.value = r;
+        startTicker();
+      }
     });
 
     // 设置窗切换主题时实时换肤
@@ -74,7 +95,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
-  clearInterval(ticker);
+  stopTicker();
   clearInterval(adviceTimer);
 });
 </script>

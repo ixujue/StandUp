@@ -2,7 +2,7 @@
 import { listen } from "@tauri-apps/api/event";
 import { computed, onMounted, ref, watch } from "vue";
 
-import { api, SKINS, type Config, type Dashboard, type SyncInfo } from "../shared/bridge";
+import { api, SKINS, type Config, type Dashboard, type Snapshot, type SyncInfo } from "../shared/bridge";
 import { applyTheme } from "../shared/theme";
 
 const config = ref<Config | null>(null);
@@ -137,7 +137,10 @@ onMounted(async () => {
   applyTheme(config.value.break_theme);
   await refresh();
   await refreshSync();
-  await listen("state-changed", refresh);
+  // 心跳每秒推快照:只更新 snapshot(读秒),summary 不动,避免每秒重算事件流水。
+  await listen<Snapshot>("state-changed", (e) => {
+    if (dashboard.value) dashboard.value.snapshot = e.payload;
+  });
   await listen("sync-changed", refreshSync);
   await listen<{ break_theme: string }>("config-changed", (e) => {
     applyTheme(e.payload.break_theme);
