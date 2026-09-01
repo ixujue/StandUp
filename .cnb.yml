@@ -3,22 +3,47 @@
 # 作为 GitHub Release 的国内下载源。
 # Windows(NSIS)/ macOS(dmg)需要对应系统环境,由 GitHub Actions 承担。
 # 注意:流水线默认 shell 是 sh(Ubuntu 为 dash),不用 source/bashism;多行脚本需显式 set -e。
+#
+# 前置配置(一次性):在 CNB 密钥仓库存放 GitHub 凭据,文件路径 .cnb/github.yml,内容形如:
+#   GITHUB_USER: ixujue
+#   GITHUB_TOKEN: ghp_xxx        # 需 repo 权限的 Personal Access Token
+#   allow_slugs: ["xujue.cn/StandUp"]
+#   allow_events: ["tag_push"]
+#   allow_images: ["tencentcom/git-sync"]
 
 $:
   tag_push:
+    # GitHub 凭据缺失(未配密钥仓库)时不阻塞 Linux 包交付,只打告警。
+    - name: sync-github
+      stages:
+        - name: 同步代码与 tag 到 GitHub
+          allowFailure: true
+          # Windows(NSIS)/ macOS(dmg)/ Android(APK)由 GitHub Actions 构建,
+          # 这里只负责把 main 与本次 tag 推过去触发它。
+          image: tencentcom/git-sync
+          settings:
+            target_url: https://github.com/ixujue/StandUp.git
+            auth_type: https
+            username: ${GITHUB_USER}
+            password: ${GITHUB_TOKEN}
+            branch: main
+            push_tags: true
+            git_user: StandUp Bot
+            git_email: bot@standup.local
+
     - name: build-linux
       runner:
         cpus: 8
       docker:
         image: ubuntu:22.04
+        volumes:
+          # 节点级缓存:加速后续构建(target 为 Cargo workspace 根的产物目录)
+          - /root/.cargo:copy-on-write
+          - /root/.rustup:copy-on-write
+          - node_modules:copy-on-write
+          - target:copy-on-write
       env:
         DEBIAN_FRONTEND: noninteractive
-      volumes:
-        # 节点级缓存:加速后续构建(target 为 Cargo workspace 根的产物目录)
-        - /root/.cargo:copy-on-write
-        - /root/.rustup:copy-on-write
-        - node_modules:copy-on-write
-        - target:copy-on-write
       stages:
         - name: 安装系统依赖
           script: |
