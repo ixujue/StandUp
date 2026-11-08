@@ -4,19 +4,19 @@
 
 - **技术栈**:Tauri 2(Rust 核心 + Web 前端)
 - **目标平台**:Windows → Android → macOS/Linux(iOS 已放弃)
-- **当前状态**:Phase 1 开发中 —— 核心状态机 crate 与 Tauri 外壳骨架已就位
+- **当前状态**:Windows / Android / macOS 三端均已出包(最新标签 v0.1.6),WebDAV 跨端同步已上线;Linux 端与 Web 统计看板待做
 
 ## 文档索引
 
 | 文档 | 内容 |
 |------|------|
 | [docs/调研分析.md](docs/调研分析.md) | 竞品格局、各平台限制、技术选型对比与依据 |
-| [docs/决策记录.md](docs/决策记录.md) | 已拍板的决策(ADR 风格,D1–D10)与待确认假设 |
+| [docs/决策记录.md](docs/决策记录.md) | 已拍板的决策(ADR 风格,D1–D14)与待确认假设 |
 | [docs/技术设计.md](docs/技术设计.md) | 模块划分、核心状态机设计、目录结构、里程碑 |
 | [docs/开发启动提示词.md](docs/开发启动提示词.md) | 用于新会话继续开发讨论的启动提示词 |
 
 ## 路线图
 
-1. **Phase 1**:Windows 桌面端 MVP(托盘常驻、可配置间隔、空闲检测、通知 + 可选全屏休息页)
-2. **Phase 2**:Android 端(前台服务,适配小米 HyperOS 后台管控)
-3. **Phase 3**:macOS / Linux、多端设置与统计同步、Web 统计看板
+1. **Phase 1** ✅:Windows 桌面端 MVP(托盘常驻、可配置间隔、空闲检测、通知 + 可选全屏休息页)
+2. **Phase 2** ✅:Android 端(前台服务,适配小米 HyperOS 后台管控;后台管控专门适配仍待打磨)
+3. **Phase 3**(进行中):macOS ✅ / Linux ⬜、多端设置与统计同步 ✅(WebDAV, D13)、Web 统计看板 ⬜
