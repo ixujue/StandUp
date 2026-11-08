@@ -4,12 +4,10 @@
 # Windows(NSIS)/ macOS(dmg)需要对应系统环境,由 GitHub Actions 承担。
 # 注意:流水线默认 shell 是 sh(Ubuntu 为 dash),不用 source/bashism;多行脚本需显式 set -e。
 #
-# 前置配置(一次性):在 CNB 密钥仓库存放 GitHub 凭据,文件路径 .cnb/github.yml,内容形如:
-#   GITHUB_USER: ixujue
-#   GITHUB_TOKEN: ghp_xxx        # 需 repo 权限的 Personal Access Token
-#   allow_slugs: ["xujue.cn/StandUp"]
-#   allow_events: ["tag_push"]
-#   allow_images: ["tencentcom/git-sync"]
+# GitHub 侧同步(2026-11-08 起):由维护者本地 push main/tag 到 ixujue/StandUp 触发
+# Actions 构建。原 sync-github 阶段因 CI 内凭据从未注入成功(GITHUB_USER/GITHUB_TOKEN
+# 缺失,失败被 allowFailure 掩盖显示通过)已移除;如需恢复,从 git 历史找回该阶段,
+# 并在 CNB 密钥仓库配置 .cnb/github.yml(GITHUB_USER/GITHUB_TOKEN + allow_events/allow_images)。
 
 $:
 
@@ -56,24 +54,8 @@ $:
             echo "已推送 $RELEASE_TAG;后续构建请到「构建」页查看同名 tag_push 流水线。"
 
   tag_push:
-    # GitHub 凭据缺失(未配密钥仓库)时不阻塞 Linux 包交付,只打告警。
-    - name: sync-github
-      stages:
-        - name: 同步代码与 tag 到 GitHub
-          allowFailure: true
-          # Windows(NSIS)/ macOS(dmg)/ Android(APK)由 GitHub Actions 构建,
-          # 这里只负责把 main 与本次 tag 推过去触发它。
-          image: tencentcom/git-sync
-          settings:
-            target_url: https://github.com/ixujue/StandUp.git
-            auth_type: https
-            username: ${GITHUB_USER}
-            password: ${GITHUB_TOKEN}
-            branch: main
-            push_tags: true
-            git_user: StandUp Bot
-            git_email: bot@standup.local
-
+    # 说明:GitHub 侧 main/tag 同步不在本流水线内,由维护者本地 push 完成
+    # (Actions 由 tag push 事件触发;本地凭据可用,历史版本均如此出包)。
     - name: build-linux
       runner:
         cpus: 8
