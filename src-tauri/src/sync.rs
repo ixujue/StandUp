@@ -9,6 +9,7 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use tauri::Manager;
 
+use crate::store::atomic_write;
 use crate::{driver, secret, AppState};
 
 const META_FILE: &str = "sync.json";
@@ -49,7 +50,7 @@ impl SyncMeta {
     }
 
     pub fn save(&self) -> std::io::Result<()> {
-        fs::write(&self.path, serde_json::to_string_pretty(&self.settings)?)
+        atomic_write(&self.path, &serde_json::to_string_pretty(&self.settings)?)
     }
 }
 
@@ -64,14 +65,9 @@ fn merge_event_lines(local: &str, remote: &str) -> Vec<String> {
             }
             let ok = serde_json::from_str::<serde_json::Value>(line)
                 .ok()
-                .and_then(|v| {
-                    let t = v.get("t")?.as_str()?.to_string();
-                    let at = v.get("at_ms")?.as_u64()?;
-                    Some((at, t))
-                });
-            if let Some((at, t)) = ok {
+                .and_then(|v| v.get("at_ms")?.as_u64());
+            if let Some(at) = ok {
                 out.push((at, line.to_string()));
-                let _ = t;
             }
         }
         out
@@ -182,8 +178,10 @@ pub fn sync_once(app: &tauri::AppHandle) -> Result<String, String> {
         s => return Err(format!("服务器返回 {s}(检查地址/账号/应用密码)")),
     }
 
-    // 2) 事件流水:并集合并
-    let local_events = fs::read_to_string(&events_path).unwrap_or_default();
+    // 2) 事件流水:并集合并。远端拉取不持锁;本地读→合并→覆盖写回
+    // 全程持 store 锁:driver 线程的 append 也在该锁内,否则
+    // "读之后、写之前"恰好 append 的新事件会被覆盖丢失
+    // (违背 D13“永不丢数据”承诺)。锁内只有本地文件毫秒级操作。
     let remote_events_url = dav_url(&settings.url, "events.jsonl");
     let resp = client
         .get(&remote_events_url)
@@ -195,18 +193,23 @@ pub fn sync_once(app: &tauri::AppHandle) -> Result<String, String> {
         reqwest::StatusCode::NOT_FOUND => String::new(),
         s => return Err(format!("服务器返回 {s}")),
     };
-    let merged = merge_event_lines(&local_events, &remote_text);
-    let merged_text = if merged.is_empty() {
-        String::new()
-    } else {
-        let mut t = merged.join("\n");
-        t.push('\n');
-        t
+    let merged_text = {
+        let mut st = state.store.lock().unwrap();
+        let local_events = fs::read_to_string(&events_path).unwrap_or_default();
+        let merged = merge_event_lines(&local_events, &remote_text);
+        let merged_text = if merged.is_empty() {
+            String::new()
+        } else {
+            let mut t = merged.join("\n");
+            t.push('\n');
+            t
+        };
+        if merged_text != local_events {
+            fs::write(&events_path, &merged_text).map_err(|e| format!("写本地流水失败: {e}"))?;
+            st.reload_events();
+        }
+        merged_text
     };
-    if merged_text != local_events {
-        fs::write(&events_path, &merged_text).map_err(|e| format!("写本地流水失败: {e}"))?;
-        state.store.lock().unwrap().reload_events();
-    }
     if merged_text != remote_text {
         client
             .put(&remote_events_url)

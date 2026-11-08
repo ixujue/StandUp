@@ -144,7 +144,11 @@ onMounted(async () => {
   await refreshSync();
   // 状态变化时只刷概览(流水聚合),快照由 useSnapshot 订阅
   await listen("state-changed", refresh);
-  await listen("sync-changed", refreshSync);
+  // 同步可能并入远端今日事件,概览一并刷新
+  await listen("sync-changed", () => {
+    refreshSync();
+    refresh();
+  });
   await listen<{ break_theme: string }>("config-changed", (e) => {
     applyTheme(e.payload.break_theme);
   });

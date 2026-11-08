@@ -58,7 +58,7 @@ impl Store {
 
     pub fn save_config(&mut self, config: &Config) -> std::io::Result<()> {
         let json = serde_json::to_string_pretty(config)?;
-        fs::write(&self.config_path, json)?;
+        atomic_write(&self.config_path, &json)?;
         self.config = config.clone();
         Ok(())
     }
@@ -78,6 +78,15 @@ impl Store {
         let (start, end) = today_range_ms();
         standup_core::summarize_day(&self.events, start, end)
     }
+}
+
+/// 原子写:先写同目录临时文件再 rename 覆盖。写入中途崩溃/断电只会留下
+/// 临时文件,目标文件要么是旧完整内容、要么是新完整内容,不会出现半截 JSON
+/// (半截 config.json 会在下次启动静默回退默认值,用户设置全丢)。
+pub(crate) fn atomic_write(path: &std::path::Path, data: &str) -> std::io::Result<()> {
+    let tmp = path.with_extension("tmp");
+    fs::write(&tmp, data)?;
+    fs::rename(&tmp, path)
 }
 
 /// 本地日历日(今日 00:00 → 次日 00:00)的毫秒区间。

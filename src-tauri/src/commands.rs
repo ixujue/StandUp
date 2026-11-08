@@ -190,8 +190,13 @@ pub fn save_sync_settings(
 }
 
 #[tauri::command]
-pub fn sync_now(app: AppHandle) -> Result<String, String> {
-    let result = crate::sync::sync_once(&app);
+pub async fn sync_now(app: AppHandle) -> Result<String, String> {
+    // 同步命令默认跑在主线程,reqwest::blocking 的网络等待(超时 20s×多次请求)
+    // 会冻结全部窗口事件处理:必须丢到阻塞线程池执行。
+    let handle = app.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || crate::sync::sync_once(&handle))
+        .await
+        .map_err(|e| format!("同步任务失败: {e}"))?;
     match &result {
         Ok(_) => {
             let _ = tauri::Emitter::emit(&app, "sync-changed", ());

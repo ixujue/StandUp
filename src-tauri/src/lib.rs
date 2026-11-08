@@ -103,6 +103,10 @@ pub fn run() {
                 }
 
                 windows::show_main(&handle);
+
+                // 启动即按当前配置刷新托盘状态文本/tooltip,否则自定义间隔时
+                // 会一直显示初始占位文案("45 分钟后"),直到第一次状态变化
+                tray::update(&handle);
             }
 
             Ok(())

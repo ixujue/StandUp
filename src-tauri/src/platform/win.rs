@@ -31,15 +31,23 @@ const WTS_SESSION_UNLOCK: usize = 0x8;
 pub fn spawn_tick_thread(tx: Sender<Input>) {
     thread::spawn(move || loop {
         thread::sleep(Duration::from_secs(1));
-        tx.send(Input::Tick { now_ms: now_ms(), idle_secs: idle_secs() }).ok();
+        if tx
+            .send(Input::Tick { now_ms: now_ms(), idle_secs: idle_secs() })
+            .is_err()
+        {
+            // driver 通道已关闭(应用退出),线程随之结束,不再空转
+            break;
+        }
     });
 }
 
 /// 系统级键鼠空闲秒数(GetLastInputInfo,与 D8 一致)。
 fn idle_secs() -> u64 {
     unsafe {
-        let mut info = LASTINPUTINFO::default();
-        info.cbSize = std::mem::size_of::<LASTINPUTINFO>() as u32;
+        let mut info = LASTINPUTINFO {
+            cbSize: std::mem::size_of::<LASTINPUTINFO>() as u32,
+            ..Default::default()
+        };
         if GetLastInputInfo(&mut info).as_bool() {
             GetTickCount().wrapping_sub(info.dwTime) as u64 / 1000
         } else {
@@ -48,7 +56,9 @@ fn idle_secs() -> u64 {
     }
 }
 
-/// message-only window:接收会话锁与电源广播,不显示、不进任务栏。
+/// 不可见的顶层窗口:接收会话锁与电源广播。
+/// 注意不能改成 message-only(HWND_MESSAGE)窗口:广播类消息
+/// (WM_POWERBROADCAST/WTS 通知)只投递给顶层窗口,message-only 收不到。
 pub fn spawn_event_thread(tx: Sender<Input>) {
     thread::spawn(move || unsafe { message_loop(tx) });
 }

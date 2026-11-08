@@ -42,7 +42,7 @@ fn dpapi_protect(plain: &[u8]) -> Result<Vec<u8>, String> {
         CryptProtectData(&input, None, None, None, None, 0, &mut output)
             .map_err(|e| format!("DPAPI 加密失败: {e}"))?;
         let bytes = std::slice::from_raw_parts(output.pbData, output.cbData as usize).to_vec();
-        LocalFreeBlob(output.pbData);
+        local_free_blob(output.pbData);
         Ok(bytes)
     }
 }
@@ -59,13 +59,13 @@ fn dpapi_unprotect(blob: &[u8]) -> Result<Vec<u8>, String> {
         CryptUnprotectData(&input, None, None, None, None, 0, &mut output)
             .map_err(|e| format!("DPAPI 解密失败: {e}"))?;
         let bytes = std::slice::from_raw_parts(output.pbData, output.cbData as usize).to_vec();
-        LocalFreeBlob(output.pbData);
+        local_free_blob(output.pbData);
         Ok(bytes)
     }
 }
 
 #[cfg(windows)]
-fn LocalFreeBlob(ptr: *mut u8) {
+fn local_free_blob(ptr: *mut u8) {
     use windows::Win32::Foundation::{LocalFree, HLOCAL};
     if !ptr.is_null() {
         unsafe {
@@ -79,7 +79,7 @@ fn hex_encode(bytes: &[u8]) -> String {
 }
 
 fn hex_decode(text: &str) -> Option<Vec<u8>> {
-    if text.len() % 2 != 0 {
+    if !text.len().is_multiple_of(2) {
         return None;
     }
     (0..text.len() / 2)

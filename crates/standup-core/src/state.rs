@@ -202,7 +202,7 @@ impl Core {
             }
             State::Away => {
                 // 常驻模式(D12):不看空闲,直接回 Active 继续累计。
-                if self.config.resident_mode || u64::from(idle_secs) * 1000 < self.threshold_ms() {
+                if self.config.resident_mode || idle_secs * 1000 < self.threshold_ms() {
                     self.state = State::Active;
                     self.seated_ms = 0;
                     self.last_tick_ms = Some(now);
@@ -223,8 +223,8 @@ impl Core {
         self.seated_ms += delta;
 
         // 常驻模式(D12):空闲不判离开;锁屏/睡眠走 SessionLock/Suspend,仍会强制 Away。
-        if !self.config.resident_mode && u64::from(idle_secs) * 1000 >= self.threshold_ms() {
-            let idle_min = (u64::from(idle_secs) / 60) as u32;
+        if !self.config.resident_mode && idle_secs * 1000 >= self.threshold_ms() {
+            let idle_min = (idle_secs / 60) as u32;
             self.enter_away();
             let mut out = Vec::new();
             if self.card_deadline_ms.take().is_some() {
@@ -525,9 +525,11 @@ mod tests {
         let mut c = core();
         let mut t = 0;
         c.handle(Input::Tick { now_ms: t, idle_secs: 0 });
-        let mut cfg = Config::default();
-        cfg.reminder_interval_min = 15;
-        cfg.fullscreen_break = true;
+        let cfg = Config {
+            reminder_interval_min: 15,
+            fullscreen_break: true,
+            ..Default::default()
+        };
         c.handle(Input::ConfigChanged(Box::new(cfg)));
         assert!(showed_card(&run(&mut c, &mut t, 15, 0)));
         let out = c.handle(Input::CardAction { now_ms: t, action: CardAction::StartBreak });
@@ -548,10 +550,9 @@ mod tests {
     #[test]
     fn resident_mode_ignores_idle_and_still_reminds() {
         let mut c = core();
-        let mut t = 0;
+        let t = 0;
         c.handle(Input::Tick { now_ms: t, idle_secs: 0 });
-        let mut cfg = Config::default();
-        cfg.resident_mode = true;
+        let cfg = Config { resident_mode: true, ..Default::default() };
         c.handle(Input::ConfigChanged(Box::new(cfg)));
         // 全程无键鼠输入(idle 持续增长)照样累计并提醒
         let mut t2 = t;
@@ -564,8 +565,7 @@ mod tests {
     fn resident_mode_still_away_on_lock() {
         let mut c = core();
         let t = 0;
-        let mut cfg = Config::default();
-        cfg.resident_mode = true;
+        let cfg = Config { resident_mode: true, ..Default::default() };
         c.handle(Input::ConfigChanged(Box::new(cfg)));
         c.handle(Input::Tick { now_ms: t, idle_secs: 0 });
         let out = c.handle(Input::SessionLock { now_ms: t + SEC });
@@ -578,15 +578,13 @@ mod tests {
         let mut c = core();
         let mut t = 0;
         c.handle(Input::Tick { now_ms: t, idle_secs: 0 });
-        let out = c.handle(Input::Tick { now_ms: t + SEC, idle_secs: 10 * 60 });
+        c.handle(Input::Tick { now_ms: t + SEC, idle_secs: 10 * 60 });
         t += SEC;
         assert_eq!(c.state(), State::Away);
         // 开启常驻模式:下一个 Tick 不看空闲,直接回 Active
-        let mut cfg = Config::default();
-        cfg.resident_mode = true;
+        let cfg = Config { resident_mode: true, ..Default::default() };
         c.handle(Input::ConfigChanged(Box::new(cfg)));
         let out = c.handle(Input::Tick { now_ms: t + SEC, idle_secs: 10 * 60 });
-        t += SEC;
         assert_eq!(c.state(), State::Active);
         assert!(out.iter().any(|o| matches!(o, Output::StateChanged)));
     }
@@ -596,8 +594,7 @@ mod tests {
         let mut c = core();
         let mut t = 0;
         c.handle(Input::Tick { now_ms: t, idle_secs: 0 });
-        let mut cfg = Config::default();
-        cfg.resident_mode = true;
+        let mut cfg = Config { resident_mode: true, ..Default::default() };
         c.handle(Input::ConfigChanged(Box::new(cfg.clone())));
         run(&mut c, &mut t, 5, 0);
         cfg.resident_mode = false;
